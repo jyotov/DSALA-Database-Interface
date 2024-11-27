@@ -1,7 +1,7 @@
 [project]
 name = "dsala"
 version = "0.1.0"
-description = "Add your description here"
+description = "Interface for DSALA client database"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
