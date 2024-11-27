@@ -1,19 +1,22 @@
+import base64
 import json
 from datetime import datetime
+from io import BytesIO
 
 import dash
 import googlemaps
+import pandas as pd
 from dash import dcc, html, dash_table, callback
 from dash.dependencies import Input, Output, State
 from geopy.distance import geodesic
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-import test
+import update
 from database import Client, Contact
 
 # database connection
-DATABASE_URL = 'sqlite:///dsala.db'  # Replace with your actual database URL
+DATABASE_URL = 'sqlite:///dsala.db'
 engine = create_engine('sqlite:///dsala.db')
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -114,7 +117,7 @@ columns = [{'name': 'ID', 'id': 'id'},
            {"name": 'Address Line 2', "id": 'address2'},
            {"name": 'City', "id": 'city'},
            {"name": 'State', "id": 'state'},
-           {"name": 'Zipcode', "id": 'zip'},
+           {"name": 'ZIP Code', "id": 'zip'},
            {"name": 'Birth Hospital', "id": 'birth_hospital'},
            {"name": 'Birth City', "id": 'birth_city'},
            {"name": 'Birth State', "id": 'birth_state'},
@@ -135,7 +138,7 @@ columns_contacts = [{'name': "DS Client's ID", 'id': 'client_id'},
            {"name": 'Address Line 2', "id": 'address2'},
            {"name": 'City', "id": 'city'},
            {"name": 'State', "id": 'state'},
-           {"name": 'Zipcode', "id": 'zip'},
+           {"name": 'ZIP Code', "id": 'zip'},
            {"name": 'Do you want to receive emails?', "id": 'receive_emails'},
            {"name": 'Notes', "id": 'notes'},
             ]
@@ -174,7 +177,7 @@ app.layout = (html.Div([
     ], style={'padding': '5px'}),
 
     html.H4(children='Location Filter'),
-    html.Div('To filter by location, enter a zipcode as the "center point" and the desired distance (in miles) from that center point. '
+    html.Div('To filter by location, enter a ZIP code as the "center point" and the desired distance (in miles) from that center point. '
              'Only clients with addresses within that radius will be displayed in the table.'),
     dcc.Input(id="zipcode-input", type="number", placeholder="Enter ZIP code", debounce=True,
               style={'margin-right': '10px'}),
@@ -221,8 +224,10 @@ app.layout = (html.Div([
             id='contacts_container'
         ),
         html.Div([
-            html.Button("Download Emails", id="btn-download-txt",style={'margin-top': '10px'}),
-            dcc.Download(id="download-text")
+            html.Button("Download Emails", id="btn-download-txt", style={'margin-top': '10px'}),
+            dcc.Download(id="download-text"),
+            html.Button("Download Table", id="table_download", style={'margin-left': '10px'}),
+            dcc.Download(id="download-table"),
         ]),
 
     ])
@@ -254,12 +259,11 @@ filtered = []
     Output('table', 'data', allow_duplicate=True),
     Output('table', 'selected_rows', allow_duplicate=True),
     Output('output', 'children'),
-    # Output('num_clients', 'children'),
     Input('refresh','n_clicks'),
     config_prevent_initial_callbacks=True
 )
 def update_table2(n_clicks):
-    test.populate()
+    update.populate()
     json_data = get_data_as_json()
     # Load JSON data into Python objects
     data = json.loads(json_data)
@@ -318,7 +322,7 @@ def update_table(min_age, max_age, zipcode, max_distance, interests, n_clicks):
                        row["state"] + " " + row["zip"])
             coords = get_coordinates(address)
             print("Coordinates: ", coords)
-            print("Zipcode ", get_coordinates(zipcode))
+            print("ZIP Code ", get_coordinates(zipcode))
             if coords:
                 distance = geodesic(get_coordinates(zipcode), coords).miles
                 if distance <= max_distance:
@@ -400,27 +404,68 @@ def display_expanded_row(selected_rows, data):
         ),
     return html.Div("No additional contacts available.")
 
-# Downloading emails of filtered clients in a .txt file
+# Downloading emails of filtered clients in a .txt file and datatable in Excel file
 @callback(
     Output("download-text", "data"),
+    Output("download-table", "data"),
     Input("btn-download-txt", "n_clicks"),
+    Input("table_download", "n_clicks"),
     prevent_initial_call=True,
 )
-def func(n_clicks):
-    global filtered_data  # Access the filtered list
+def func(n_clicks_txt, n_clicks_table):
+    global filtered_data
 
-    emails = ""
-    for person in filtered_data:
-        # emails of clients
-        emails += person.get("email", "") + "\n"
-        # emails of contacts of clients
-        client_contacts_json = get_data_contacts_as_json(person["id"])
-        client_contacts = json.loads(client_contacts_json)
-        for contact in client_contacts:
-            emails += contact.get("email", "") + "\n"
+    triggered_id = dash.callback_context.triggered_id
 
-    return dict(content=emails, filename="emails_" + datetime.today().strftime('%Y-%m-%d') + ".txt")
+    # Emails download
+    if triggered_id == "btn-download-txt":
+        email_list = []
+        for person in filtered_data:
+            # emails of clients
+            email_list.append(person.get("email"))
+            # emails of contacts of clients
+            client_contacts_json = get_data_contacts_as_json(person["id"])
+            client_contacts = json.loads(client_contacts_json)
+            for contact in client_contacts:
+                email_list.append(contact.get("email"))
+                # email_list.append(contact.get("email", "") + "\n")
+        print(email_list)
+        no_duplicates = []
+        [no_duplicates.append(email) for email in email_list if email not in no_duplicates]
+        print(no_duplicates)
+        result_string = "\n".join(no_duplicates)
+        print(result_string)
 
+        return dict(content=result_string, filename="emails_" + datetime.today().strftime('%Y-%m-%d') + ".txt"), None
+
+    # Table download
+    elif triggered_id == "table_download":
+        clients = pd.DataFrame(filtered_data)
+        contacts_data = []
+        for person in filtered_data:
+            client_contacts_json = get_data_contacts_as_json(person["id"])
+            client_contacts = json.loads(client_contacts_json)
+            contacts_data.extend(client_contacts)
+
+        contacts = pd.DataFrame(contacts_data)
+
+        # Downloading an Excel file with two sheets
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            clients.to_excel(writer, index=False, sheet_name="Clients")
+            contacts.to_excel(writer, index=False, sheet_name="Contacts")
+
+        output.seek(0)
+
+        # Encoding binary data to base 64
+        encoded_file = base64.b64encode(output.getvalue()).decode()
+
+        # Return None for email text and Excel data
+        return None, dict(content=encoded_file, filename="table_" + datetime.today().strftime('%Y-%m-%d') + ".xlsx",
+                          type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64=True)
+
+    # If neither button is clicked
+    return None, None
 
 if __name__ == '__main__':
     app.run_server(debug=True)
