@@ -4,9 +4,6 @@ from database import Database, Client, Contact
 gs = GSheet()
 db = Database()
 
-# Modify populate to check the database if a record of a client exists
-#   If it does, then update it
-#   If it doesn't, then create it
 def populate() -> None:
     for client in gs.get_clients():
         if old_client := db.session.query(Client).where(Client.id == client["ID"]).first():
@@ -105,9 +102,6 @@ def populate() -> None:
 
 # print(os.getcwd())
 # populate()
-# TODO:
-#       pull all records from the database and show them in dash in a datatable
-#       have 2 data tables -- when you select a client, it can refresh the contract table
 
 # print("-" * 100)
 # for c in db.session.query(Contact).all():
