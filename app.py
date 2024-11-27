@@ -253,6 +253,7 @@ def calculate_age(birthdate):
     return age
 
 filtered = []
+# Hi
 
 # Refreshing table
 @callback(
