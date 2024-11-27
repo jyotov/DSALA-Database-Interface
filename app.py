@@ -427,14 +427,14 @@ def func(n_clicks_txt, n_clicks_table):
             client_contacts_json = get_data_contacts_as_json(person["id"])
             client_contacts = json.loads(client_contacts_json)
             for contact in client_contacts:
-                email_list.append(contact.get("email"))
-                # email_list.append(contact.get("email", "") + "\n")
-        print(email_list)
+                if contact["receive_emails"] == "Yes":
+                    email_list.append(contact.get("email"))
+        #print(email_list)
         no_duplicates = []
         [no_duplicates.append(email) for email in email_list if email not in no_duplicates]
-        print(no_duplicates)
+        #print(no_duplicates)
         result_string = "\n".join(no_duplicates)
-        print(result_string)
+        #print(result_string)
 
         return dict(content=result_string, filename="emails_" + datetime.today().strftime('%Y-%m-%d') + ".txt"), None
 
