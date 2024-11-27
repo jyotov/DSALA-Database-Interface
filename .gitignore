@@ -1,5 +1,5 @@
 /client.json
 /token.json
-/dsala.db
+/dsala.db*
 __pycache__
 .DS_Store
