@@ -156,7 +156,7 @@ app.layout = (html.Div([
 
     html.Div('Search for clients in the database. Be sure to click the "Refresh Data" button below to generate the most '
              'updated version of the client database. '
-             'Clients can be filtered based on their age and their location of residence. '
+             'Clients can be filtered based on their age, their location of residence, and their interests. '
              'After applying the desired filters, click the "Download Emails" button to generate a text (.txt) '
              'file of all clients and their associated contacts. These emails can then be copied directly as email recipients.'),
 
@@ -184,7 +184,7 @@ app.layout = (html.Div([
     dcc.Input(id="distance-input", type="number", placeholder="Distance in miles", debounce=True,style={'margin-top': '5px'}),
 
     html.H4(children='Interest Filter'),
-    html.Div('To filter by client interests, check the interests (sports, dancing, art and/or acting to display in the table. '
+    html.Div('To filter by client interests, check the interests (sports, dancing, art and/or acting) to display in the table. '
              'Clients who have indicated any of the selected interests will be displayed in the table.'),
     dcc.Checklist(
         id="interest-filter",
